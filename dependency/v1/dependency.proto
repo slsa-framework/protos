@@ -1,0 +1,246 @@
+// Keep in sync with the schema at
+// https://github.com/slsa-framework/slsa/blob/main/spec/dependency-provenance.md
+syntax = "proto3";
+
+package slsa.dependency.v1;
+
+import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/slsa-framework/protos/dependency/v1";
+option java_package = "dev.slsa.dependency.v1";
+
+// NOTE: This file uses snake_case per the Protocol Buffers Style Guide.
+// The predicate is serialized to JSON with lowerCamelCase; protobuf tooling
+// performs this conversion automatically.
+//
+// NOTE: Validation of all fields is left to the users of this proto. In
+// particular, the Dependency Track defines per-level requirements
+// (REQUIRED at L2+, etc.) that are not expressed in this schema. See
+// https://github.com/slsa-framework/slsa/blob/main/spec/dependency-provenance.md
+// for the per-level matrix.
+
+// Proto representation of predicate type https://slsa.dev/dependency/v1
+message DependencyIngestionProvenance {
+  Ingestor ingestor = 1;
+  IngestionPlatform ingestion_platform = 2;
+  UpstreamRef upstream = 3;
+  IngestionEvent ingestion = 4;
+
+  // Present for dependencies resolved transitively from another admitted
+  // dependency. Absent (or default) for top-level dependencies declared
+  // directly by the ingestor.
+  ResolvedFromRef resolved_from = 5;
+
+  // Descriptive: attests to scans the platform chose to run. The Dependency
+  // Track does not prescribe which scans MUST be run.
+  repeated Scan scans = 6;
+
+  IntegrityVerdict integrity = 7;
+  PublisherSignatureVerdict publisher_signature = 8;
+
+  // Descriptive: attests to admission policies the platform applied. The
+  // Dependency Track does not prescribe which policies MUST be applied.
+  repeated PolicyEvaluation policy_evaluations = 9;
+
+  // Verdicts on upstream-published attestations verified by the platform
+  // (Build Provenance, VSA, upstream-signed VEX, or any other predicate type
+  // the upstream publishes). At Dep L3, at least one entry MUST be present
+  // describing the platform's upstream-attestation-verification stance for
+  // this dep (a verified attestation, a failed verification, a "not
+  // attempted" verdict, or an "unavailable" verdict identifying a specific
+  // predicate type the platform looked for and did not find).
+  repeated UpstreamAttestationRef upstream_attestations = 10;
+
+  SigningIsolation signing_isolation = 11;
+  IngestionIsolation ingestion_isolation = 12;
+}
+
+// The organization that operates the Dependency Ingestion Platform and
+// consumes the dependency.
+message Ingestor {
+  // URI identifying the ingestor (e.g., "https://example.com/").
+  string id = 1;
+  // Human-readable name.
+  string name = 2;
+}
+
+// The Dependency Ingestion Platform that emitted this attestation.
+message IngestionPlatform {
+  // URI identifying the platform. Represents the transitive closure of
+  // components trusted to admit dependencies, apply controls, and emit
+  // attestations.
+  string id = 1;
+  // Implementer-defined platform version.
+  string version = 2;
+}
+
+// Upstream identity of the admitted dependency.
+message UpstreamRef {
+  // URI of the upstream registry from which the artifact was originally
+  // retrieved.
+  string registry = 1;
+  // Package name in the upstream registry's namespace.
+  string name = 2;
+  // Package version.
+  string version = 3;
+  // Cryptographic digest of the upstream artifact as published, keyed by
+  // algorithm.
+  map<string, string> digest = 4;
+}
+
+// Per-event metadata about a single ingestion.
+message IngestionEvent {
+  // RFC 3339 timestamp of the ingestion event.
+  google.protobuf.Timestamp timestamp = 1;
+  // URI of the internal path used to admit the artifact (typically the
+  // platform-mirrored URL of the dependency).
+  string path = 2;
+}
+
+// For a transitively-resolved dependency, identifies the direct dependency
+// that pulled this artifact in.
+message ResolvedFromRef {
+  // Cryptographic digest of the direct (parent) dependency artifact whose
+  // resolution brought this artifact in. Matches the parent's Statement
+  // subject digest.
+  map<string, string> subject_digest = 1;
+
+  // Implementer-defined relationship label (e.g., "runtime-dependency",
+  // "dev-dependency", "build-dependency").
+  string relationship = 2;
+}
+
+// A verdict from a scan the platform ran against this dependency.
+message Scan {
+  // The scan type. Common values: "vulnerability", "eol", "malware",
+  // "license". Implementer-defined types are allowed.
+  string type = 1;
+  Scanner scanner = 2;
+  // Identifier of the data source the scanner consulted (e.g., "OSV", "NVD",
+  // "endoflife.date"). MAY be a comma-separated list of sources.
+  string data_source = 3;
+  // RFC 3339 timestamp of the scan or of the attempted check.
+  google.protobuf.Timestamp timestamp = 4;
+  // Scanner-defined verdict (e.g., "clean", "vulnerable", "eol").
+  string verdict = 5;
+  // Set to "unavailable" when no data source covers the dep for this scan
+  // type. Distinguishes "checked, none found" from "not checked".
+  string availability = 6;
+  // Scanner-specific details (e.g., CVE list for a vulnerability scan).
+  google.protobuf.Struct details = 7;
+}
+
+message Scanner {
+  // URI identifying the scanner.
+  string id = 1;
+  // Scanner version.
+  string version = 2;
+}
+
+// Identity-verification verdict for per-fetch integrity.
+message IntegrityVerdict {
+  // One of "hash", "signature".
+  string method = 1;
+  // URI identifying the verifying key. REQUIRED if method is "signature".
+  string key_id = 2;
+  // The expected hash or signature value (e.g., from a lockfile, an upstream
+  // signing manifest, or a curated allow-list).
+  map<string, string> expected = 3;
+  // One of "verified", "failed", "unverified". At L2+ MUST be "verified" for
+  // admitted artifacts. "failed" MUST NOT appear for an artifact admitted to
+  // the platform.
+  string result = 4;
+}
+
+// Identity-verification verdict for publisher signature.
+message PublisherSignatureVerdict {
+  // Identifier of the signing scheme (e.g., "npm-provenance", "gpg",
+  // "sigstore", "cosign").
+  string method = 1;
+  // URI or identifier of the publisher's expected signing identity.
+  string key_id = 2;
+  // One of "verified", "failed", "unverified".
+  string result = 3;
+  // Set to "unavailable" when upstream does not publish a publisher
+  // signature. Distinguishes "no publisher signature was published" from
+  // "verification was not attempted".
+  string availability = 4;
+}
+
+// Record of an admission policy the platform evaluated against this
+// dependency.
+message PolicyEvaluation {
+  Policy policy = 1;
+  // RFC 3339 timestamp of evaluation.
+  google.protobuf.Timestamp timestamp = 2;
+  // One of "allow", "deny". A "deny" verdict implies admission was refused;
+  // Provenance MUST NOT be emitted with a "deny" for an admitted artifact.
+  string result = 3;
+  // Free-text description of the policy, for verifiers and auditors.
+  string description = 4;
+}
+
+message Policy {
+  // URI identifying the policy.
+  string id = 1;
+  // Policy version.
+  string version = 2;
+}
+
+// Reference to and verdict on a single upstream-published attestation for
+// this dependency. Multiple entries MAY appear in
+// DependencyIngestionProvenance.upstream_attestations when the upstream
+// publishes multiple attestation types (for example, both a Build Provenance
+// and a VSA), or when the platform recorded verification stances for
+// multiple predicate types.
+message UpstreamAttestationRef {
+  // URI of the upstream predicate type this entry is about (e.g.,
+  // "https://slsa.dev/provenance/v1", "https://slsa.dev/verification_summary/v1").
+  // REQUIRED.
+  string predicate_type = 1;
+  // Reference to the upstream attestation (DSSE envelope URI or
+  // content-addressed digest). REQUIRED if verification.result is
+  // "verified" or "failed".
+  string ref = 2;
+  UpstreamAttestationVerification verification = 3;
+  // Set to "unavailable" when upstream does not publish an attestation of
+  // predicate_type. Distinguishes "no such upstream attestation was
+  // published" from "verification was not attempted".
+  string availability = 4;
+}
+
+message UpstreamAttestationVerification {
+  // One of "verified", "failed", "not-attempted".
+  string result = 1;
+}
+
+// Records how the platform isolated Provenance signing infrastructure from
+// code that runs during ingestion. Addresses the L3 anti-subversion claim
+// that the Provenance signing key was not reachable by any process that
+// executed dep-supplied code.
+message SigningIsolation {
+  // One of "separate-signer-process", "hardware-backed-key",
+  // "post-ingestion-signing", "other".
+  string method = 1;
+  // Free-text description of how the platform achieved isolation, suitable
+  // for an auditor.
+  string description = 2;
+  // URI of the signing service identity. MUST be distinct from any identity
+  // that executed dep-supplied code.
+  string signer_identity = 3;
+}
+
+// Records how the platform isolated this dep's ingestion from the ingestion
+// of other deps. Addresses the L3 anti-subversion claim that no other dep's
+// ingestion could have contaminated this dep's ingestion, and vice versa.
+message IngestionIsolation {
+  // One of "no-dep-code-executed", "ephemeral-per-dep-environment", "other".
+  string method = 1;
+  // Free-text description of how the platform achieved isolation.
+  string description = 2;
+  // Implementer-defined identifier of the ingestion environment (e.g.,
+  // container ID, sandbox session ID) when method is
+  // "ephemeral-per-dep-environment".
+  string environment_id = 3;
+}
