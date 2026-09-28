@@ -13,7 +13,7 @@ packages are generated at the repo root, so the import paths are
 | Build provenance v1 | `https://slsa.dev/provenance/v1` | [`proto/build/v1/predicate.proto`](proto/build/v1/predicate.proto) | `github.com/slsa-framework/protos/build/v1` |
 | Build provenance v0.2 | `https://slsa.dev/provenance/v0.2` | [`proto/build/v02/predicate.proto`](proto/build/v02/predicate.proto) | `github.com/slsa-framework/protos/build/v02` |
 | Verification summary (VSA) v1 | `https://slsa.dev/verification_summary/v1` | [`proto/vsa/v1/predicate.proto`](proto/vsa/v1/predicate.proto) | `github.com/slsa-framework/protos/vsa/v1` |
-| Source provenance v1 | source track (source-tool) | [`proto/sourcetool/v1/predicate.proto`](proto/sourcetool/v1/predicate.proto) | `github.com/slsa-framework/protos/sourcetool/v1` |
+| Source provenance v1 | `https://github.com/slsa-framework/source-tool/source-provenance/v1` and `…/tag-provenance/v1` (see [`sourcetool/v1/types.go`](sourcetool/v1/types.go)) | [`proto/sourcetool/v1/predicate.proto`](proto/sourcetool/v1/predicate.proto) | `github.com/slsa-framework/protos/sourcetool/v1` |
 
 The build and VSA predicates were migrated from
 [in-toto/attestation](https://github.com/in-toto/attestation) via slsa-core,
